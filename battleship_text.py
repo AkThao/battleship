@@ -271,7 +271,7 @@ def game_loop():
         game.choose_x_position()
         game.choose_y_position()
         if game.check_for_repeat_position(turns):
-            turns -= 1
+            # turns -= 1
             continue
         if game.check_for_enemy_hit():
             game.draw_board()
