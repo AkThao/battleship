@@ -1,12 +1,23 @@
+#!/usr/bin/env python3
+
 import time
 from random import randint, choice
 
-##############################################################################
-#### DEFINE SHIP CLASS THAT STORES SIZE AND POSITIONS OF EACH SHIP OBJECT ####
-##############################################################################
+
 class Ship():
+    """Ship properties:
+    Size
+    ID
+    Starting position
+    List of positions it occupies
+
+    Ship methods:
+    pick_random_point – give the ship starting coordinates that are not already occupied
+    place_on_board – give the ship a full list of its positions on the board
+    """
+
     def __init__(self, id):
-        self.size = None
+        """Ship attributes"""
         self.positions = []
         self.x = None
         self.y = None
@@ -14,12 +25,14 @@ class Ship():
         self.ship_size = None # This is actually (true length - 1) because it doesn't account for starting position
 
     def pick_random_point(self, used_pos, max_size):
+        """Give the ship random starting coordinates, provided they aren't already in use"""
         exclude = [pos[:2] for pos in used_pos]
         [self.x, self.y] = [randint(0, max_size - 1), randint(0, max_size - 1)]
+        # Assign starting position, but try again if starting position is not available
         return self.pick_random_point(used_pos, max_size) if [self.y, self.x] in exclude else [self.x, self.y]
 
     def place_on_board(self, used_pos, max_size, board):
-        # Pick random starting coordinate for ship, as long as coordinate is not already occupied
+        """Pick random starting coordinate for ship and use its size to define a list of positions it will occupy"""
         [self.x, self.y] = self.pick_random_point(used_pos, max_size)
 
         used_pos.append([self.y, self.x, self.id])
@@ -98,8 +111,12 @@ class Ship():
 
         return used_pos
 
+
 class Game():
+    """Stores the board, ships and user stats"""
+
     def __init__(self):
+        """Game attributes"""
         self.board_size = None
         self.board = None
         self.user_x = None
@@ -109,7 +126,7 @@ class Game():
         self.ships = []
         self.ship_positions = []
         self.ship_hits = [] # How many ships have been hit
-        self.ids = [] # IDs of all ships
+        self.ship_lengths = [] # Lengths of all ships
         self.sunk = [] # Whether or not ships have been sunken
         self.ship_coords = [] # Same as ship_positions, but without the IDs
         self.won = None
@@ -117,6 +134,7 @@ class Game():
         self.user_moves = [] # All the moves the user has taken
 
     def intro(self):
+        """Print game title"""
         print("""
 **********************
 ** Battleship Game! **
@@ -125,12 +143,13 @@ class Game():
         self.intro_on = 0
 
     def initialise_board(self):
+        """Create board of size specified by user"""
         print("\nCreating board....")
         self.board = [[0 for x in range(self.board_size)] for y in range(self.board_size)]
         time.sleep(0.5)
 
     def draw_board(self):
-        # Draw a game board with the specified dimensions
+        """Draw a game board with the specified dimensions"""
         time.sleep(0.5)
         print("\n")
         print("   |", end="")
@@ -146,9 +165,11 @@ class Game():
         print("\n")
 
     def update_board(self, symbol):
+        """Change the relevant entry in the board to the correct symbol"""
         self.board[self.user_y][self.user_x] = symbol
 
     def choose_x_position(self):
+        """Allow user to enter x coordinate of next move and perform validation testing on input"""
         time.sleep(0.5)
         # Range of acceptable letters
         lower_case = range(ord('a'), ord(chr(ord('a') + self.board_size)))
@@ -156,6 +177,7 @@ class Game():
 
         # Accept value of x coordinate
         self.user_x = input(f"Choose the x coordinate of your next move (A - {str(chr(65 + self.board_size - 1))}): ")
+        # Input validation
         if any(char.isdigit() for char in self.user_x) or len(self.user_x) != 1:
             print("\nInput must be a single letter, try again.\n")
             time.sleep(1)
@@ -169,8 +191,11 @@ class Game():
             self.user_x = ord(self.user_x) - 65
 
     def choose_y_position(self):
+        """Allow user to enter y coordinate of next move and perform validation testing on input"""
+        time.sleep(0.5)
         # Accept value of y coordinate
         self.user_y = input(f"Choose the y coordinate of your next move (1 - {self.board_size}): ")
+        # Input validation
         if self.user_y.isdigit() == False:
             print("\nInput must be a number, try again.\n")
             time.sleep(1)
@@ -184,7 +209,7 @@ class Game():
             self.user_y = self.user_y - 1
 
     def create_enemy_ships(self):
-        # Create hidden enemy ships at a random positions and in random orientations on the board
+        """Create hidden enemy ships at random positions and in random orientations on the board"""
         self.num_ships = self.board_size # Arbitrary but reasonable
         self.ships = [None] * self.num_ships
         # Make a list of ship objects using the Ship class
@@ -196,14 +221,17 @@ class Game():
         """for position in self.ship_positions: # TESTING
                                     self.board[position[0]][position[1]] = position[2].lstrip("id_") # TESTING"""
 
+        # Make a list of ship lengths
         for ship in self.ships:
-            self.ids.append(len(ship.positions))
+            self.ship_lengths.append(len(ship.positions))
 
-        self.ship_hits = [0] * len(self.ids)
-        self.sunk = [0] * len(self.ids)
-        self.ship_coords = [pos[:2] for pos in self.ship_positions]
+        # Store stats for each ship
+        self.ship_hits = [0] * len(self.ship_lengths)
+        self.sunk = [0] * len(self.ship_lengths)
+        self.ship_coords = [pos[:2] for pos in self.ship_positions] # Slice up to index 2 because index 2 is ship ID
 
     def check_for_repeat_position(self, turns):
+        """Prevent user from entering coordinates they've already entered"""
         if [self.user_x, self.user_y] in self.user_moves:
             if turns == 1:
                 print("\nYou have already chosen this position.\n")
@@ -216,27 +244,29 @@ class Game():
         return False
 
     def check_for_enemy_hit(self):
-        #### SHIP HIT DETECTION ALGORITHM ####
-        # Make a list with length = self.num_ships
-        # Each element will be the number of times a ship position of a particular id has been hit
-        # The list will begin with all elements equal to 0
-        # When a full ship has been hit, its element in this list will be equal to ship.ship_size + 1
-        # When a ship has been hit, rather than placing an 'X' on the board, place some other unique identifier
+        """Ship hit detection algorithm:
+        Make a list with length = self.num_ships
+        Each element will be the number of times a ship position of a particular id has been hit
+        The list will begin with all elements equal to 0
+        When a full ship has been hit, its element in this list will be equal to ship.ship_size + 1
+        When a ship has been hit, rather than placing an 'X' on the board, place some other unique identifier
+        """
         if [self.user_y, self.user_x] in self.ship_coords:
             print("\nYou have scored a hit!")
+            # Update ship stats
             index = self.ship_coords.index([self.user_y, self.user_x])
             id = int(self.ship_positions[index][2].lstrip("id_"))
             self.ship_hits[id - 1] += 1
             self.hit = 1
             self.update_board(str(id))
 
-
         for i in range(len(self.ship_hits)):
-            if self.ship_hits[i] == self.ids[i] and self.sunk[i] == 0:
+            # If number of hits equals the ship length, the entire ship has been hit
+            if self.ship_hits[i] == self.ship_lengths[i] and self.sunk[i] == 0:
                 print(f"\nYou have sunken ship {i + 1}!")
                 self.sunk[i] = 1
 
-        if self.ids == self.ship_hits:
+        if self.ship_lengths == self.ship_hits:
             print(f"\nYou have sunken all ships!")
             self.won = 1
 
@@ -245,20 +275,22 @@ class Game():
             return True
         return False
 
-
     def win(self):
+        """Print win message"""
         time.sleep(1)
         print("\nCongratulations! You have won the game!\n")
 
     def game_over(self):
+        """Print game over message"""
         time.sleep(1)
         print("\nGame over! You have failed to sink all ships.\n")
 
 
 def game_loop():
+    """Start game loop, which facilitates input-driven game play"""
     game.draw_board()
     game.create_enemy_ships()
-    turns = len(game.ship_positions) + game.board_size
+    turns = len(game.ship_positions) + game.board_size # Arbitrary function for calculting number of turns
     game.won = 0
     while turns >= 0:
         if turns == 0:
@@ -270,19 +302,25 @@ def game_loop():
         print(f"Turns = {turns}")
         game.choose_x_position()
         game.choose_y_position()
+        # Check if user coordinates have already been used
         if game.check_for_repeat_position(turns):
             continue
+        # Check if user has hit a ship
         if game.check_for_enemy_hit():
             game.draw_board()
             game.user_moves.append([game.user_x, game.user_y])
             turns -= 1
             continue
+        # "*" for missed hit
         game.update_board("*")
         game.draw_board()
+        # Store moves user has made
         game.user_moves.append([game.user_x, game.user_y])
         turns -= 1
 
+
 def main():
+    """Set up game before starting game loop"""
     if game.intro_on:
         game.intro()
     time.sleep(1)
